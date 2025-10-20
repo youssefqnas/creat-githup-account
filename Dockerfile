@@ -36,8 +36,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # نسخ سكريبت الأتمتة إلى مجلد العمل
 # نفترض أن كود Python المحفوظ لديك يسمى automation_script.py
-COPY automation_script.py .
+COPY main.py .
 
 # تحديد الأمر الذي سيتم تنفيذه عند تشغيل الحاوية
 # استخدام 'python -u' يضمن أن يكون مخرج python غير مخزن مؤقتاً (unbuffered)، وهو أمر مفيد لـ Real-time logging في Zeabur
 CMD ["python", "-u", "main.py"]
+
