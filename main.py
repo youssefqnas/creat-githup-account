@@ -11,7 +11,7 @@ from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from selenium.webdriver.common.action_chains import ActionChains
 
 # --- النطاق الثابت المطلوب ---
-FIXED_DOMAIN = "@mesemails.fr.nf"
+FIXED_DOMAIN = "@mail.i-dork.com"
 
 # تهيئة التسجيل (Log) ليظهر في السجلات
 # هذا يضمن أن الرسائل ستظهر في سجلات Zeabur بشكل منظم
@@ -288,4 +288,5 @@ def run_automation():
 
 if __name__ == "__main__":
     run_automation()
+
 
