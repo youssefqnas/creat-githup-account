@@ -1,42 +1,35 @@
-FROM python:3.10-slim
+# Dockerfile
 
-# ضبط متغيرات البيئة لمنع ظهور النوافذ المنبثقة وتحسين الأداء
-ENV DEBIAN_FRONTEND=noninteractive
-ENV PYTHONUNBUFFERED 1
-ENV CHROMIUM_PATH /usr/bin/chromium-browser
+# -----------------
+# 1. مرحلة البناء (Build Stage)
+# -----------------
 
-# تثبيت Chromium والحد الأدنى من الاعتماديات اللازمة للتشغيل في وضع headless
-# تم حذف الحزم التي سببت المشكلة مثل libgconf-2-4 و libgdk-pixbuf2.0-0
-RUN apt-get update && \
-    apt-get install -y \
-    chromium \
-    chromium-driver \
-    libnss3 \
-    libatk1.0-0 \
-    libatk-bridge2.0-0 \
-    libgtk-3-0 \
-    libasound2 \
-    libfontconfig \
-    libnspr4 \
-    libxtst6 \
-    fonts-liberation \
-    xdg-utils \
-    --no-install-recommends && \
-    rm -rf /var/lib/apt/lists/*
+# ابدأ من صورة بايثون رسمية. نسخة "slim" تكون أصغر حجماً وأكثر كفاءة.
+FROM python:3.9-slim-bullseye
 
-# إنشاء مجلد العمل داخل حاوية Docker
-WORKDIR /usr/src/app
+# عيّن مجلد العمل داخل الحاوية. جميع الأوامر التالية ستنفذ من هذا المسار.
+WORKDIR /app
 
-# نسخ ملفات المتطلبات وتثبيتها
+# -----------------
+# 2. تثبيت الاعتماديات (Dependencies)
+# -----------------
+
+# انسخ ملف الاعتماديات أولاً.
+# هذه الخطوة تستفيد من التخزين المؤقت في دوكر (caching).
+# إذا لم يتغير ملف requirements.txt، لن يتم إعادة تنفيذ هذه الخطوة في عمليات البناء التالية.
 COPY requirements.txt .
+
+# قم بتثبيت جميع المكتبات المذكورة في الملف.
+# --no-cache-dir يمنع pip من تخزين الكاش لتقليل حجم الصورة النهائية.
 RUN pip install --no-cache-dir -r requirements.txt
 
-# نسخ سكريبت الأتمتة إلى مجلد العمل
-# نفترض أن كود Python المحفوظ لديك يسمى automation_script.py
-COPY main.py .
+# -----------------
+# 3. نسخ الكود وتشغيل التطبيق
+# -----------------
 
-# تحديد الأمر الذي سيتم تنفيذه عند تشغيل الحاوية
-# استخدام 'python -u' يضمن أن يكون مخرج python غير مخزن مؤقتاً (unbuffered)، وهو أمر مفيد لـ Real-time logging في Zeabur
-CMD ["python", "-u", "main.py"]
+# الآن، انسخ باقي ملفات المشروع (مثل main.py) إلى مجلد العمل.
+COPY . .
 
-
+# الأمر الذي سيتم تنفيذه عند بدء تشغيل الحاوية.
+# سيقوم بتشغيل السكريبت الرئيسي الخاص بك.
+CMD ["python", "main.py"]
