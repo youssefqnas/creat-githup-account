@@ -17,8 +17,8 @@ RUN apt-get update \
         xauth \
         libnss3 \
         libxss1 \
-        libappindicator1 \
-        libindicator7 \
+        libappindicator3-1 \
+        libayatana-indicator7 \
         fonts-liberation \
         xdg-utils \
         libgbm-dev \
