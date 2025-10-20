@@ -1,22 +1,19 @@
-# Dockerfile
-#
-# استخدم صورة أساسية تحتوي على Python وبعض الأدوات الأساسية
 FROM python:3.10-slim
 
 # ضبط متغيرات البيئة لمنع ظهور النوافذ المنبثقة وتحسين الأداء
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED 1
+ENV CHROMIUM_PATH /usr/bin/chromium-browser
 
-# تثبيت Chromium و الاعتماديات اللازمة لتشغيل undetected_chromedriver/Selenium في وضع headless
+# تثبيت Chromium والحد الأدنى من الاعتماديات اللازمة للتشغيل في وضع headless
+# تم حذف الحزم التي سببت المشكلة مثل libgconf-2-4 و libgdk-pixbuf2.0-0
 RUN apt-get update && \
     apt-get install -y \
     chromium \
     chromium-driver \
     libnss3 \
-    libgconf-2-4 \
     libatk1.0-0 \
     libatk-bridge2.0-0 \
-    libgdk-pixbuf2.0-0 \
     libgtk-3-0 \
     libasound2 \
     libfontconfig \
@@ -41,4 +38,5 @@ COPY main.py .
 # تحديد الأمر الذي سيتم تنفيذه عند تشغيل الحاوية
 # استخدام 'python -u' يضمن أن يكون مخرج python غير مخزن مؤقتاً (unbuffered)، وهو أمر مفيد لـ Real-time logging في Zeabur
 CMD ["python", "-u", "main.py"]
+
 
