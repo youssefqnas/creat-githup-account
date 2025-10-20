@@ -114,7 +114,12 @@ def run_automation():
         options.add_argument("--disable-popup-blocking")
         options.add_argument("--disable-notifications")
         options.add_argument("--start-maximized")
-        driver = uc.Chrome(options=options)
+        
+        # التغيير هنا: تمرير مسار Google Chrome الذي تم تثبيته في Dockerfile
+        chrome_binary_path = '/usr/bin/google-chrome' 
+        # ملاحظة: uc.Chrome سيقوم الآن بتحميل ChromeDriver متوافق مع إصدار Google Chrome الحديث الذي تم تثبيته
+        driver = uc.Chrome(options=options, browser_executable_path=chrome_binary_path) 
+        
         setup_ad_blocking(driver)
         wait = WebDriverWait(driver, 30)
 
@@ -292,3 +297,4 @@ def run_automation():
 
 if __name__ == "__main__":
     run_automation()
+
