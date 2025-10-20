@@ -46,4 +46,5 @@ COPY main.py .
 # الأمر لتشغيل الكود باستخدام Xvfb
 # Xvfb-run هو الأمر الذي يشغل البرنامج داخل بيئة عرض وهمية
 
-CMD ["xvfb-run", "--server-args=-screen 0 1024x768x24", "python", "main.py"]
+CMD ["xvfb-run", "--server-args=-screen 0 1024x768x24", "python", "-u", "main.py"]
+
