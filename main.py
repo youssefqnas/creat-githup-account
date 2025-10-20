@@ -116,17 +116,21 @@ def run_automation():
     try:
         # 1. إعداد المتصفح
         options = uc.ChromeOptions()
-        # استخدام الوضع الرأسي (headless) مهم جداً للتشغيل على Zeabur/Docker
+        
+        # وسائط تقليل استهلاك الموارد - مهمة جداً في بيئات الاستضافة
         options.add_argument("headless-new")
+        options.add_argument("--disable-gpu")
+        options.add_argument("--no-sandbox") # ضرورية جداً في بيئات Docker/Zeabur
+        options.add_argument("--disable-dev-shm-usage") # يحل مشاكل الذاكرة المؤقتة
+
         options.add_argument("--disable-popup-blocking")
         options.add_argument("--disable-notifications")
         options.add_argument("--start-maximized")
-
+        
         # مسار Chrome/Chromium الثابت داخل حاوية Docker
         chrome_binary_path = '/usr/bin/google-chrome' 
         
         logging.info("بدء تشغيل undetected_chromedriver...")
-        # تأكد من استخدام browser_executable_path
         driver = uc.Chrome(options=options, browser_executable_path=chrome_binary_path)
         setup_ad_blocking(driver)
         wait = WebDriverWait(driver, 30)
@@ -305,3 +309,4 @@ def run_automation():
 
 if __name__ == "__main__":
     run_automation()
+
