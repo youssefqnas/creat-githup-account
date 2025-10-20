@@ -129,12 +129,21 @@ def run_automation():
         options.add_argument("--disable-popup-blocking")
         options.add_argument("--disable-notifications")
         
-        # تحديد مسار الـ ChromeDriver المثبت داخل Docker
+        # إعداد المتصفح: السماح لـ undetected_chromedriver بتحديد مكان متصفح Chromium
         log_message("تم إعداد وسائط المتصفح بنجاح، جاري بدء تشغيل السيلينيوم.")
+        
+        chrome_exec_path = uc.find_chrome_executable()
+        if not chrome_exec_path:
+             # إذا لم يجده uc، نحدد المسار الشائع لـ Chromium يدوياً
+            chrome_exec_path = '/usr/bin/chromium' 
+        
+        log_message(f"مسار متصفح كروم المحدد: {chrome_exec_path}")
+        
         driver = uc.Chrome(
             options=options, 
-            driver_executable_path="/usr/bin/chromedriver"
+            browser_executable_path=chrome_exec_path # توجيه uc إلى المتصفح نفسه
         )
+        
         setup_ad_blocking(driver)
         wait = WebDriverWait(driver, 30)
 
