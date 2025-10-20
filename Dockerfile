@@ -6,6 +6,10 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         # Xvfb و xvfb-run
         xvfb \
+        # **الإضافة الجديدة هنا لحل مشكلة 'xauth command not found'**
+        xauth \
+        # بديل محتمل في حالة عدم وجود xauth كحزمة منفصلة: x11-utils
+        # x11-utils \
         # متطلبات Chromium الأساسية
         libgtk-3-0 \
         libnspr4 \
@@ -41,4 +45,5 @@ COPY main.py .
 
 # الأمر لتشغيل الكود باستخدام Xvfb
 # Xvfb-run هو الأمر الذي يشغل البرنامج داخل بيئة عرض وهمية
+
 CMD ["xvfb-run", "--server-args=-screen 0 1024x768x24", "python", "main.py"]
