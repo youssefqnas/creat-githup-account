@@ -1,50 +1,59 @@
-# ابدأ من صورة بايثون مع الأدوات الأساسية (مثل debian-slim)
-FROM python:3.11-slim
+# استخدام آخر نسخة مستقرة من بايثون 3.12 (slim)
+FROM python:3.12-slim-bullseye
 
-# قم بتحديث نظام التشغيل وتثبيت حزم التشغيل اللازمة لـ Xvfb و Playwright
+# تعيين متغير البيئة لجعل تثبيت الحزم غير تفاعلي
+ENV DEBIAN_FRONTEND=noninteractive
+
+# تثبيت متصفح Chrome وتبعياته (Xvfb)
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        # Xvfb و xvfb-run
+        wget \
+        unzip \
         xvfb \
-        # **الإضافة الجديدة هنا لحل مشكلة 'xauth command not found'**
         xauth \
-        # بديل محتمل في حالة عدم وجود xauth كحزمة منفصلة: x11-utils
-        # x11-utils \
-        # متطلبات Chromium الأساسية
-        libgtk-3-0 \
-        libnspr4 \
+        # تثبيت حزم أساسية لحل تبعيات Chrome
+        # يجب أن تكون هذه الحزم كافية للتشغيل في بيئة headless
         libnss3 \
-        libdrm2 \
-        libdbus-1-3 \
-        libexpat1 \
-        libfontconfig1 \
-        libglib2.0-0 \
-        libjpeg-dev \
-        libpng-dev \
-        libwebp-dev \
-        libxkbcommon0 \
-        # تنظيف لتقليل حجم الصورة
+        libxss1 \
+        libappindicator1 \
+        libindicator7 \
+        fonts-liberation \
+        xdg-utils \
+        libgbm-dev \
+        libu2f-udev \
+        libcups2 \
+        libgtk-3-0 \
+    # 1. تحميل حزمة Google Chrome .deb مباشرةً
+    && wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \
+    \
+    # 2. تثبيت الحزمة (dpkg قد يفشل بسبب التبعيات)
+    && dpkg -i /tmp/chrome.deb || true \
+    \
+    # 3. تثبيت التبعيات المفقودة وحل أي فشل في dpkg
+    && apt-get install -fy \
+    \
+    # 4. تنظيف الملفات المؤقتة لتصغير حجم الصورة
+    && rm /tmp/chrome.deb \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# تعيين دليل العمل
+# إعداد دليل العمل داخل الحاوية
 WORKDIR /app
 
-# نسخ ملف متطلبات بايثون
+# نسخ ملف المتطلبات وتثبيت مكتبات بايثون
 COPY requirements.txt .
-
-# تثبيت متطلبات بايثون
 RUN pip install --no-cache-dir -r requirements.txt
 
-# تثبيت متصفحات Playwright (اختياري، يمكنك ترك Zeabur يفعلها)
-# إذا كنت تريد التأكد من الإصدار الصحيح:
-RUN playwright install chromium
+# نسخ ملفات الكود
+# نستخدم اسم الملف كما هو 'creat githup.py'
+COPY creat\ githup.py .
 
-# نسخ الكود الخاص بك
-COPY main.py .
+# إنشاء ملف النطاقات الافتراضي لتجنب خطأ إذا لم يكن موجوداً
+RUN echo "@yopmail.com" > "yopmail domain.txt"
 
-# الأمر لتشغيل الكود باستخدام Xvfb
-# Xvfb-run هو الأمر الذي يشغل البرنامج داخل بيئة عرض وهمية
+# تعيين نقطة الدخول (ENTRYPOINT) لتشغيل السكريبت باستخدام Xvfb
+# يستخدم Zeabur هذا الأمر كعملية رئيسية للحاوية.
+ENTRYPOINT ["xvfb-run", "-a", "-s", "-screen 0 1280x1024x24"]
 
-CMD ["xvfb-run", "--server-args=-screen 0 1024x768x24", "python", "-u", "main.py"]
-
+# الأمر الذي سيتم تنفيذه ضمن بيئة Xvfb
+CMD ["python", "main.py"]
