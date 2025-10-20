@@ -44,70 +44,46 @@ def setup_ad_blocking(driver):
 
 # --- دالة فتح GitHub في تاب جديد (ثلاث طرق مع تشخيص) ---
 def open_github_in_new_tab(driver, github_url, wait):
-    """محاولة فتح GitHub في تاب جديد بثلاث طرق مع لوج تشخيصي.
-    ترجع True لو نجحت في فتح التاب والانتقال إليه، وإلا False."""
-    logging.info("محاولة فتح GitHub في تاب جديد — بدء سلسلة المحاولات.")
+    """
+    تحاول فتح GitHub في تاب جديد والانتقال إليه.
+    ترجع True لو نجحت في فتح التاب والانتقال إليه، وإلا False.
+    """
+    logging.info("بدء محاولة فتح GitHub في تاب جديد عبر JavaScript.")
+    original_window = driver.current_window_handle
+    initial_handles = set(driver.window_handles)
+    
+    # الطريقة 1: استخدام window.open() لفتح تاب جديد
     try:
-        orig_handles = driver.window_handles.copy()
-    except Exception:
-        orig_handles = []
-    logging.info(f"handles قبل الفتح: {orig_handles}")
-
-    # طريقة 1: استخدام window.open(url, '_blank')
-    try:
+        logging.info("محاولة: window.open(url, '_blank')")
         driver.execute_script("window.open(arguments[0], '_blank');", github_url)
-        WebDriverWait(driver, 8).until(lambda d: len(d.window_handles) > len(orig_handles))
-        new_handle = [h for h in driver.window_handles if h not in orig_handles][-1]
+        
+        # الانتظار حتى يظهر مقبض نافذة جديد
+        wait.until(EC.number_of_windows_to_be(len(initial_handles) + 1))
+        
+        # تحديد المقبض الجديد والتبديل إليه
+        new_handle = [h for h in driver.window_handles if h not in initial_handles][-1]
         driver.switch_to.window(new_handle)
-        # ننتظر حتى تتغير URL أو يظهر عنوان الصفحة
-        WebDriverWait(driver, 15).until(lambda d: "github.com" in d.current_url or d.title != "")
-        logging.info(f"نجح الفتح بالطريقة 1 (window.open). handles الآن: {driver.window_handles}")
+        
+        # التأكد من أن العنوان قد تم تحميله بنجاح
+        wait.until(lambda d: "github.com" in d.current_url or d.title != "")
+        logging.info("نجحت طريقة window.open(). تم التبديل إلى التاب الجديد.")
         return True
-    except Exception as e1:
-        logging.warning(f"الطريقة 1 فشلت: {repr(e1)}")
+        
+    except TimeoutException:
+        logging.warning("فشل: انتهت مهلة الانتظار لظهور التاب الجديد أو تحميل GitHub.")
+        # نحاول العودة إلى التاب الأصلي وتنظيف الوضع
         try:
-            logging.warning(f"handles بعد محاولة 1: {driver.window_handles}")
-        except Exception:
+            driver.switch_to.window(original_window)
+        except:
             pass
-
-    # طريقة 2: استخدام Selenium 4 new_window (موثوقة أكثر)
-    try:
-        logging.info("محاولة الفتح بالطريقة 2: driver.switch_to.new_window('tab') ...")
-        # هذا الصيط يفتح تبويب جديد ويبدل إليه
+        return False
+    except Exception as e:
+        logging.error(f"فشل غير متوقع أثناء فتح التاب الجديد: {repr(e)}")
+        # نحاول العودة إلى التاب الأصلي وتنظيف الوضع
         try:
-            driver.switch_to.new_window('tab')
-        except Exception as e_sw:
-            # بعض إصدارات undetected_chromedriver قد لا تدعم هذه الطريقة؛ نطبع السبب
-            logging.warning(f"switch_to.new_window فشل: {repr(e_sw)}")
-            raise
-
-        driver.get(github_url)
-        WebDriverWait(driver, 15).until(lambda d: "github.com" in d.current_url or d.title != "")
-        logging.info(f"نجح الفتح بالطريقة 2 (new_window). handles الآن: {driver.window_handles}")
-        return True
-    except Exception as e2:
-        logging.warning(f"الطريقة 2 فشلت: {repr(e2)}")
-        try:
-            logging.warning(f"handles بعد محاولة 2: {driver.window_handles}")
-        except Exception:
+            driver.switch_to.window(original_window)
+        except:
             pass
-
-    # طريقة 3 (fallback): افتح في نفس التبويب كتشخيص — لنفهم إذا كان المشكلة في الفتح الفعلي للتبويب أو في الوصول للصفحة
-    try:
-        logging.info("محاولة الفتح بالطريقة 3 (فتح في نفس التبويب لأغراض تشخيصية)...")
-        driver.get(github_url)
-        WebDriverWait(driver, 15).until(lambda d: "github.com" in d.current_url or d.title != "")
-        logging.info(f"تم فتح GitHub في نفس التبويب (للتشخيص). current_url: {driver.current_url}")
-        return True
-    except Exception as e3:
-        logging.warning(f"الطريقة 3 فشلت أيضاً: {repr(e3)}")
-        # اطبع مقتطف من مصدر الصفحة للمساعدة في التشخيص
-        try:
-            logging.warning(f"current_url: {driver.current_url}")
-            page_snippet = driver.page_source[:1000]
-            logging.warning(f"Page source snippet (first 1000 chars):\n{page_snippet}")
-        except Exception as eprint:
-            logging.warning(f"فشل في طباعة مصدر الصفحة: {repr(eprint)}")
         return False
 
 
@@ -309,4 +285,5 @@ def run_automation():
 
 if __name__ == "__main__":
     run_automation()
+
 
