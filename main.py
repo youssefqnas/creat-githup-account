@@ -2,7 +2,8 @@ import time
 import random
 import string
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
-
+print("التبويب 1: تم فتح Yopmail.")
+sys.stdout.flush() # اجعل النظام يطبع ما تم تخزينه فوراً
 # --- النطاق الثابت (Fixed Domain) ---
 FIXED_DOMAIN = "@webclub.infos.st"
 # تم حذف DOMAINS_FILE و BLACKLIST_FILE
@@ -220,4 +221,5 @@ def run_automation():
                 print("تم إغلاق المتصفح.")
 
 if __name__ == "__main__":
+
     run_automation()
