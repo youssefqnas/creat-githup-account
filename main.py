@@ -80,14 +80,28 @@ def open_github_in_new_tab(driver, github_url, wait):
 def run_automation():
     driver = None
     try:
-        # 1. إعداد المتصفح
+# 1. إعداد المتصفح
         options = uc.ChromeOptions()
-        options.add_argument("--disable-popup-blocking")
-        options.add_argument("--disable-notifications")
-        options.add_argument("--start-maximized")
+        
+        # وسائط أساسية لتمكين Chrome من العمل في بيئة Docker/Headless
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
-        driver = uc.Chrome(options=options)
+        options.add_argument("--window-size=1920,1080")
+        options.add_argument("--disable-gpu")
+        
+        # استخدام الوضع الرأسي (headless)
+        options.add_argument("headless-new")
+        
+        # وسائط سابقة
+        options.add_argument("--disable-popup-blocking")
+        options.add_argument("--disable-notifications")
+        
+        # تحديد مسار الـ ChromeDriver المثبت داخل Docker
+        log_message("تم إعداد وسائط المتصفح بنجاح، جاري بدء تشغيل السيلينيوم.")
+        driver = uc.Chrome(
+            options=options, 
+            driver_executable_path="/usr/bin/chromedriver"
+        )
         setup_ad_blocking(driver)
         wait = WebDriverWait(driver, 30)
 
@@ -149,3 +163,4 @@ def run_automation():
 
 if __name__ == "__main__":
     run_automation()
+
