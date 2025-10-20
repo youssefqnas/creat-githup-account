@@ -225,56 +225,42 @@ def run_automation():
             return
         
         # 7.5. استخراج الكود من iframe الرسالة
+        # 7.5. استخراج الكود من iframe الرسالة
         verification_code = None
         try:
             wait.until(EC.frame_to_be_available_and_switch_to_it((By.ID, "ifmail")))
             logging.info("تم التبديل إلى iframe محتوى الرسالة (ifmail).")
 
-            # الحصول على نص الرسالة بالكامل
-            code_container = wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, "#mail, body"))) 
-            raw_text = code_container.text
+            # المحدد لاستخراج الكود (يجب أن يكون رقماً مكوناً من 6 خانات)
+            code_selector = "#mail > div > table > tbody > tr > td > center > table:nth-child(2) > tbody > tr > td > table > tbody > tr > td > table > tbody > tr > td > span:nth-child(5)"
+            code_element = wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, code_selector)))
             
-            # البحث عن أول سلسلة من الأرقام في النص المستخرج (بغض النظر عن الطول)
-            match = re.search(r'\d+', raw_text)
-            
-            if match:
-                verification_code = match.group(0)
-                logging.info(f"تم استخراج كود التحقق بنجاح (طول {len(verification_code)}): {verification_code}")
-            else:
-                logging.error("لم يتم العثور على أي كود رقمي في محتوى الرسالة.")
+            verification_code = code_element.text.strip()
+            logging.info(f"تم استخراج كود التحقق بنجاح: {verification_code}")
 
             driver.switch_to.default_content() # الخروج من iframe الرسالة
         except TimeoutException:
-            logging.error("فشل في التبديل إلى iframe الرسالة أو استخراج النص.")
-            driver.switch_to.default_content()
-            return
-        except Exception as e:
-            logging.exception(f"حدث خطأ أثناء محاولة استخراج الكود: {e}")
-            driver.switch_to.default_content()
-            return
+            logging.error("فشل في استخراج كود التحقق من الرسالة.")
 
         # 7.6. إدخال الكود في صفحة GitHub
-        # **********************************************
-        # إلغاء كافة شروط التحقق والاعتماد على ما تم استخراجه
-        # **********************************************
-        if verification_code: 
+        if verification_code and verification_code.isdigit() and len(verification_code) == 8:
             driver.switch_to.window(driver.window_handles[1]) # تبديل لتبويب GitHub
-            logging.info(f"تم العودة إلى تبويب GitHub لإدخال الكود ذو الطول {len(verification_code)}.")
+            logging.info("تم العودة إلى تبويب GitHub لإدخال الكود.")
 
-            # إدخال الكود رقمًا برقم في حقول الإدخال.
+            # إدخال الكود رقمًا برقم في حقول الإدخال الستة
             for i, digit in enumerate(verification_code):
                 try:
-                    input_field_id = f"launch-code-{i}" 
-                    input_field = driver.find_element(By.ID, input_field_id)
+                    input_field = driver.find_element(By.ID, f"launch-code-{i}")
                     input_field.send_keys(digit)
                 except NoSuchElementException:
-                    logging.warning(f"تحذير: لم يتم العثور على حقل الإدخال رقم {i} ({input_field_id}). توقف عن إدخال باقي الأرقام.")
+                    logging.error(f"لم يتم العثور على حقل الإدخال رقم {i}")
                     break
-            logging.info("تم إدخال الكود بالكامل (أو بقدر ما سمحت به حقول الإدخال).")
+            logging.info("تم إدخال الكود بالكامل.")
 
             # 7.7. انتظار والنقر على زر التأكيد النهائي
             time.sleep(2)
             try:
+                # المحدد لزر التأكيد بعد إدخال الكود
                 submit_button_selector = "body > div.logged-out.env-production.page-responsive.height-full.d-flex.flex-column.header-overlay > div.application-main.d-flex.flex-auto.flex-column > div > main > div > div.signups-rebrand__container-form.position-relative > div.d-flex.flex-justify-center.signups-rebrand__container-inner > react-partial > div > div > div:nth-child(1) > form > div:nth-child(4) > button"
                 submit_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, submit_button_selector)))
                 submit_button.click()
@@ -283,7 +269,7 @@ def run_automation():
                 logging.error("فشل العثور على زر تأكيد الكود أو النقر عليه.")
 
         else:
-            logging.error("فشل عملية إدخال الكود: لم يتم استخراج كود صالح.")
+            logging.error("فشل عملية إدخال الكود: لم يتم استخراج كود صالح (ليس 6 أرقام).")
 
 
         # 8. انتظار إضافي للمشاهدة
@@ -302,3 +288,4 @@ def run_automation():
 
 if __name__ == "__main__":
     run_automation()
+
