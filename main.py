@@ -227,31 +227,56 @@ def run_automation():
             wait.until(EC.frame_to_be_available_and_switch_to_it((By.ID, "ifmail")))
             logging.info("تم التبديل إلى iframe محتوى الرسالة (ifmail).")
 
-            # المحدد لاستخراج الكود (يجب أن يكون رقماً مكوناً من 6 خانات)
-            code_selector = "#mail > div > table > tbody > tr > td > center > table:nth-child(2) > tbody > tr > td > table > tbody > tr > td > table > tbody > tr > td > span:nth-child(5)"
-            code_element = wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, code_selector)))
+            # المحدد الجديد لاستخراج الكود (أصبح 8 أرقام - غالباً ما يكون المحدد هو لكتلة النص كلها)
+            # بما أنك رأيت الكود في السجل، فسنعتمد على استخراجه من محدد عام ثم تنقيته
             
-            verification_code = code_element.text.strip()
+            # محدد أكثر عمومية لـ 8 أرقام (قد نحتاج إلى استخدام XPath أكثر مرونة)
+            # سنحاول محدد CSS الذي كان يعمل، ولكن قد يكون مختلفاً قليلاً الآن
+            code_selector = "span.verification-code" # محدد افتراضي شائع
+            
+            # أو نستخدم XPath للبحث عن أي رقم في نص الرسالة (الأكثر موثوقية هنا)
+            code_element = wait.until(EC.visibility_of_element_located((By.XPATH, "//*[contains(@style, 'font-size') and contains(@style, '24px') or @class='verification-code']")))
+            
+            # إذا فشل المحدد أعلاه، نعود إلى المحدد القديم ونتوقع أنه قد تغير
+            # الكود القديم: code_selector = "#mail > div > table > tbody > tr > td > center > table:nth-child(2) > tbody > tr > td > table > tbody > tr > td > table > tbody > tr > td > span:nth-child(5)"
+
+            # استخدام الكود الذي تم استخراجه كدليل: 07547192 (8 أرقام)
+            raw_text = code_element.text.strip()
+            
+            # تنقية النص لاستخراج الأرقام فقط
+            verification_code = ''.join(filter(str.isdigit, raw_text))
+
             logging.info(f"تم استخراج كود التحقق بنجاح: {verification_code}")
 
             driver.switch_to.default_content() # الخروج من iframe الرسالة
         except TimeoutException:
             logging.error("فشل في استخراج كود التحقق من الرسالة.")
+        except Exception as e:
+            logging.error(f"حدث خطأ أثناء محاولة استخراج الكود: {e}")
+            driver.switch_to.default_content()
+            return
 
         # 7.6. إدخال الكود في صفحة GitHub
-        if verification_code and verification_code.isdigit() and len(verification_code) == 6:
+        # **********************************************
+        # إزالة شرط الـ 6 أرقام وتطبيق الشرط على أي عدد من الأرقام
+        # **********************************************
+        if verification_code and verification_code.isdigit():
             driver.switch_to.window(driver.window_handles[1]) # تبديل لتبويب GitHub
-            logging.info("تم العودة إلى تبويب GitHub لإدخال الكود.")
+            logging.info(f"تم العودة إلى تبويب GitHub لإدخال الكود ذو الطول {len(verification_code)}.")
 
-            # إدخال الكود رقمًا برقم في حقول الإدخال الستة
+            # إدخال الكود رقمًا برقم في حقول الإدخال.
+            # عدد حقول الإدخال قد يكون 6 أو 8، سنحاول إدخال الكود المستخرج بالكامل.
             for i, digit in enumerate(verification_code):
                 try:
-                    input_field = driver.find_element(By.ID, f"launch-code-{i}")
+                    # بناء معرف الحقل بناءً على فهرس الرقم
+                    input_field_id = f"launch-code-{i}" 
+                    input_field = driver.find_element(By.ID, input_field_id)
                     input_field.send_keys(digit)
                 except NoSuchElementException:
-                    logging.error(f"لم يتم العثور على حقل الإدخال رقم {i}")
-                    break
-            logging.info("تم إدخال الكود بالكامل.")
+                    # قد يتم الوصول إلى نهاية الحقول (مثلاً، الكود 8 أرقام ولكن الحقول 6 فقط)
+                    logging.warning(f"تحذير: لم يتم العثور على حقل الإدخال رقم {i} ({input_field_id}). قد يكون عدد الحقول أقل من طول الكود المستخرج.")
+                    break # توقف عن محاولة إدخال باقي الأرقام
+            logging.info("تم إدخال الكود بالكامل (أو بقدر ما سمحت به الحقول).")
 
             # 7.7. انتظار والنقر على زر التأكيد النهائي
             time.sleep(2)
@@ -285,5 +310,6 @@ def run_automation():
 
 if __name__ == "__main__":
     run_automation()
+
 
 
