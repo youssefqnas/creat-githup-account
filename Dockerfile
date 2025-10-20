@@ -1,52 +1,43 @@
-# استخدام نسخة مستقرة من Python
-FROM python:3.12-slim-bullseye
+# Dockerfile
+#
+# استخدم صورة أساسية تحتوي على Python وبعض الأدوات الأساسية
+FROM python:3.10-slim
 
-# تعيين متغير البيئة لجعل تثبيت الحزم غير تفاعلي
+# ضبط متغيرات البيئة لمنع ظهور النوافذ المنبثقة وتحسين الأداء
 ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED 1
 
-# ⚡️ تفعيل الطباعة الفورية (منع buffering)
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONIOENCODING=utf-8
+# تثبيت Chromium و الاعتماديات اللازمة لتشغيل undetected_chromedriver/Selenium في وضع headless
+RUN apt-get update && \
+    apt-get install -y \
+    chromium \
+    chromium-driver \
+    libnss3 \
+    libgconf-2-4 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libgdk-pixbuf2.0-0 \
+    libgtk-3-0 \
+    libasound2 \
+    libfontconfig \
+    libnspr4 \
+    libxtst6 \
+    fonts-liberation \
+    xdg-utils \
+    --no-install-recommends && \
+    rm -rf /var/lib/apt/lists/*
 
-# تثبيت المتصفح والتبعيات (Xvfb و Google Chrome)
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        wget \
-        unzip \
-        xvfb \
-        xauth \
-        libnss3 \
-        libxss1 \
-        libappindicator3-1 \
-        libayatana-indicator7 \
-        fonts-liberation \
-        xdg-utils \
-        libgbm-dev \
-        libu2f-udev \
-        libcups2 \
-        libgtk-3-0 \
-    && wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \
-    && dpkg -i /tmp/chrome.deb || true \
-    && apt-get install -fy \
-    && rm /tmp/chrome.deb \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+# إنشاء مجلد العمل داخل حاوية Docker
+WORKDIR /usr/src/app
 
-# إعداد دليل العمل داخل الحاوية
-WORKDIR /app
-
-# نسخ المتطلبات وتثبيتها
+# نسخ ملفات المتطلبات وتثبيتها
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# نسخ الكود بالكامل (بدون هروب المسافات)
-COPY . .
+# نسخ سكريبت الأتمتة إلى مجلد العمل
+# نفترض أن كود Python المحفوظ لديك يسمى automation_script.py
+COPY automation_script.py .
 
-# إنشاء ملف نطاقات افتراضي
-RUN echo "@yopmail.com" > "yopmail domain.txt"
-
-# ⚙️ إعداد نقطة الدخول لتشغيل Xvfb
-ENTRYPOINT ["xvfb-run", "-a", "-s", "-screen 0 1280x1024x24"]
-
-# 🧠 تشغيل البرنامج في وضع غير مكدس الـ stdout
+# تحديد الأمر الذي سيتم تنفيذه عند تشغيل الحاوية
+# استخدام 'python -u' يضمن أن يكون مخرج python غير مخزن مؤقتاً (unbuffered)، وهو أمر مفيد لـ Real-time logging في Zeabur
 CMD ["python", "-u", "main.py"]
