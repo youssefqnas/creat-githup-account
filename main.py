@@ -2,8 +2,8 @@ import time
 import undetected_chromedriver as uc
 import random
 import string
-# استيراد مكتبة التسجيل
 import logging 
+import re # مكتبة للتعامل مع التعبيرات النمطية (لاستخراج الكود)
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -14,7 +14,7 @@ from selenium.webdriver.common.action_chains import ActionChains
 FIXED_DOMAIN = "@mesemails.fr.nf"
 
 # تهيئة التسجيل (Log) ليظهر في السجلات
-# هذا يضمن أن الرسائل ستظهر في سجلات Zeabur
+# هذا يضمن أن الرسائل ستظهر في سجلات Zeabur بشكل منظم
 logging.basicConfig(
     level=logging.INFO, # ابدأ من مستوى INFO
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -42,10 +42,10 @@ def setup_ad_blocking(driver):
         logging.warning(f"فشل إعداد حظر الإعلانات عبر CDP: {e}")
 
 
-# --- دالة فتح GitHub في تاب جديد (ثلاث طرق مع تشخيص) ---
+# --- دالة فتح GitHub في تاب جديد (طريقة مبسطة ومحسّنة) ---
 def open_github_in_new_tab(driver, github_url, wait):
     """
-    تحاول فتح GitHub في تاب جديد والانتقال إليه.
+    تحاول فتح GitHub في تاب جديد والانتقال إليه عبر JavaScript.
     ترجع True لو نجحت في فتح التاب والانتقال إليه، وإلا False.
     """
     logging.info("بدء محاولة فتح GitHub في تاب جديد عبر JavaScript.")
@@ -93,20 +93,21 @@ def run_automation():
         # 1. إعداد المتصفح
         options = uc.ChromeOptions()
         
-        # وسائط تقليل استهلاك الموارد - مهمة جداً في بيئات الاستضافة
+        # وسائط تحسين الأداء في بيئات الحاوية
         options.add_argument("headless-new")
         options.add_argument("--disable-gpu")
-        options.add_argument("--no-sandbox") # ضرورية جداً في بيئات Docker/Zeabur
-        options.add_argument("--disable-dev-shm-usage") # يحل مشاكل الذاكرة المؤقتة
-
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        
         options.add_argument("--disable-popup-blocking")
         options.add_argument("--disable-notifications")
         options.add_argument("--start-maximized")
-        
-        # مسار Chrome/Chromium الثابت داخل حاوية Docker
+
+        # مسار Chrome/Chromium الثابت داخل حاوية Docker (يتطلب Dockerfile معدل)
         chrome_binary_path = '/usr/bin/google-chrome' 
         
         logging.info("بدء تشغيل undetected_chromedriver...")
+        # تأكد من استخدام browser_executable_path
         driver = uc.Chrome(options=options, browser_executable_path=chrome_binary_path)
         setup_ad_blocking(driver)
         wait = WebDriverWait(driver, 30)
@@ -182,12 +183,11 @@ def run_automation():
         except Exception:
             logging.warning("تحذير: ربما ظهر تحدي CAPTCHA بعد النقرة الأولى، أو أن النقرة الثانية لم تكن ضرورية.")
 
-        # 7. التعامل مع تأكيد البريد الإلكتروني واستخراج الكود (هذا الجزء يعتمد على صندوق Yopmail الوارد)
+        # 7. التعامل مع تأكيد البريد الإلكتروني واستخراج الكود
         logging.info("\n--- بدء خطوة تأكيد البريد الإلكتروني ---")
         
         # 7.1. انتظار صفحة "تأكيد البريد الإلكتروني" في GitHub
         try:
-            # ننتظر ظهور نص التأكيد في صفحة GitHub
             wait.until(EC.visibility_of_element_located((By.XPATH, "//*[contains(text(), 'Confirm your email address')]")))
             logging.info("تم الوصول إلى صفحة 'Confirm your email address' في GitHub.")
             time.sleep(10) # انتظار لوصول البريد
@@ -201,7 +201,6 @@ def run_automation():
         # 7.3. النقر على زر التحديث في Yopmail
         try:
             refresh_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "#refresh")))
-            # استخدام ActionChains للنقر الموثوق به
             actions = ActionChains(driver)
             actions.move_to_element(refresh_button).click_and_hold().release().perform()
             logging.info("تم النقر على زر التحديث في Yopmail.")
@@ -213,75 +212,69 @@ def run_automation():
         try:
             wait.until(EC.frame_to_be_available_and_switch_to_it((By.ID, "ifrinbox")))
             logging.info("تم التبديل إلى iframe صندوق الوارد (ifrinbox).")
-            # النقر على الرسالة التي تحتوي على الكود
-            github_email = wait.until(EC.element_to_be_clickable((By.XPATH, "//div[contains(text(), 'Your GitHub launch code')]")))
+            
+            # محدد أكثر مرونة للرسالة
+            github_email = wait.until(EC.element_to_be_clickable((By.XPATH, "//div[contains(text(), 'GitHub') or contains(text(), 'launch code')]")))
             github_email.click()
             logging.info("تم النقر على رسالة GitHub.")
             driver.switch_to.default_content() # الخروج من iframe صندوق الوارد
+            
         except TimeoutException:
-            logging.error("فشل العثور على iframe أو رسالة GitHub.")
-
+            logging.error("فشل العثور على iframe صندوق الوارد أو رسالة GitHub بعد محاولة التحديث. إنهاء العملية.")
+            driver.switch_to.default_content()
+            return
+        
         # 7.5. استخراج الكود من iframe الرسالة
         verification_code = None
         try:
             wait.until(EC.frame_to_be_available_and_switch_to_it((By.ID, "ifmail")))
             logging.info("تم التبديل إلى iframe محتوى الرسالة (ifmail).")
 
-            # المحدد الجديد لاستخراج الكود (أصبح 8 أرقام - غالباً ما يكون المحدد هو لكتلة النص كلها)
-            # بما أنك رأيت الكود في السجل، فسنعتمد على استخراجه من محدد عام ثم تنقيته
+            # الحصول على نص الرسالة بالكامل
+            code_container = wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, "#mail, body"))) 
+            raw_text = code_container.text
             
-            # محدد أكثر عمومية لـ 8 أرقام (قد نحتاج إلى استخدام XPath أكثر مرونة)
-            # سنحاول محدد CSS الذي كان يعمل، ولكن قد يكون مختلفاً قليلاً الآن
-            code_selector = "span.verification-code" # محدد افتراضي شائع
+            # البحث عن أول سلسلة من الأرقام في النص المستخرج (بغض النظر عن الطول)
+            match = re.search(r'\d+', raw_text)
             
-            # أو نستخدم XPath للبحث عن أي رقم في نص الرسالة (الأكثر موثوقية هنا)
-            code_element = wait.until(EC.visibility_of_element_located((By.XPATH, "//*[contains(@style, 'font-size') and contains(@style, '24px') or @class='verification-code']")))
-            
-            # إذا فشل المحدد أعلاه، نعود إلى المحدد القديم ونتوقع أنه قد تغير
-            # الكود القديم: code_selector = "#mail > div > table > tbody > tr > td > center > table:nth-child(2) > tbody > tr > td > table > tbody > tr > td > table > tbody > tr > td > span:nth-child(5)"
-
-            # استخدام الكود الذي تم استخراجه كدليل: 07547192 (8 أرقام)
-            raw_text = code_element.text.strip()
-            
-            # تنقية النص لاستخراج الأرقام فقط
-            verification_code = ''.join(filter(str.isdigit, raw_text))
-
-            logging.info(f"تم استخراج كود التحقق بنجاح: {verification_code}")
+            if match:
+                verification_code = match.group(0)
+                logging.info(f"تم استخراج كود التحقق بنجاح (طول {len(verification_code)}): {verification_code}")
+            else:
+                logging.error("لم يتم العثور على أي كود رقمي في محتوى الرسالة.")
 
             driver.switch_to.default_content() # الخروج من iframe الرسالة
         except TimeoutException:
-            logging.error("فشل في استخراج كود التحقق من الرسالة.")
+            logging.error("فشل في التبديل إلى iframe الرسالة أو استخراج النص.")
+            driver.switch_to.default_content()
+            return
         except Exception as e:
-            logging.error(f"حدث خطأ أثناء محاولة استخراج الكود: {e}")
+            logging.exception(f"حدث خطأ أثناء محاولة استخراج الكود: {e}")
             driver.switch_to.default_content()
             return
 
         # 7.6. إدخال الكود في صفحة GitHub
         # **********************************************
-        # إزالة شرط الـ 6 أرقام وتطبيق الشرط على أي عدد من الأرقام
+        # إلغاء كافة شروط التحقق والاعتماد على ما تم استخراجه
         # **********************************************
-        if verification_code and verification_code.isdigit():
+        if verification_code: 
             driver.switch_to.window(driver.window_handles[1]) # تبديل لتبويب GitHub
             logging.info(f"تم العودة إلى تبويب GitHub لإدخال الكود ذو الطول {len(verification_code)}.")
 
             # إدخال الكود رقمًا برقم في حقول الإدخال.
-            # عدد حقول الإدخال قد يكون 6 أو 8، سنحاول إدخال الكود المستخرج بالكامل.
             for i, digit in enumerate(verification_code):
                 try:
-                    # بناء معرف الحقل بناءً على فهرس الرقم
                     input_field_id = f"launch-code-{i}" 
                     input_field = driver.find_element(By.ID, input_field_id)
                     input_field.send_keys(digit)
                 except NoSuchElementException:
-                    # قد يتم الوصول إلى نهاية الحقول (مثلاً، الكود 8 أرقام ولكن الحقول 6 فقط)
-                    logging.warning(f"تحذير: لم يتم العثور على حقل الإدخال رقم {i} ({input_field_id}). قد يكون عدد الحقول أقل من طول الكود المستخرج.")
-                    break # توقف عن محاولة إدخال باقي الأرقام
-            logging.info("تم إدخال الكود بالكامل (أو بقدر ما سمحت به الحقول).")
+                    logging.warning(f"تحذير: لم يتم العثور على حقل الإدخال رقم {i} ({input_field_id}). توقف عن إدخال باقي الأرقام.")
+                    break
+            logging.info("تم إدخال الكود بالكامل (أو بقدر ما سمحت به حقول الإدخال).")
 
             # 7.7. انتظار والنقر على زر التأكيد النهائي
             time.sleep(2)
             try:
-                # المحدد لزر التأكيد بعد إدخال الكود
                 submit_button_selector = "body > div.logged-out.env-production.page-responsive.height-full.d-flex.flex-column.header-overlay > div.application-main.d-flex.flex-auto.flex-column > div > main > div > div.signups-rebrand__container-form.position-relative > div.d-flex.flex-justify-center.signups-rebrand__container-inner > react-partial > div > div > div:nth-child(1) > form > div:nth-child(4) > button"
                 submit_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, submit_button_selector)))
                 submit_button.click()
@@ -290,7 +283,7 @@ def run_automation():
                 logging.error("فشل العثور على زر تأكيد الكود أو النقر عليه.")
 
         else:
-            logging.error("فشل عملية إدخال الكود: لم يتم استخراج كود صالح (ليس 6 أرقام).")
+            logging.error("فشل عملية إدخال الكود: لم يتم استخراج كود صالح.")
 
 
         # 8. انتظار إضافي للمشاهدة
@@ -301,7 +294,6 @@ def run_automation():
     except TimeoutException:
         logging.error("فشل بسبب انتهاء مهلة الانتظار (Timeout).")
     except Exception as e:
-        # هنا سنستخدم logging.exception لطباعة مسار الخطأ كاملاً (Stacktrace) في السجل
         logging.exception(f"حدث خطأ غير متوقع: {e}")
     finally:
         if driver:
@@ -310,6 +302,3 @@ def run_automation():
 
 if __name__ == "__main__":
     run_automation()
-
-
-
