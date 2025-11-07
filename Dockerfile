@@ -1,52 +1,35 @@
-# Dockerfile
+FROM python:3.11-slim
 
-# -----------------
-# 1. مرحلة البناء (Build Stage)
-# -----------------
+ENV DEBIAN_FRONTEND=noninteractive
 
-# ابدأ من صورة بايثون رسمية. نسخة "slim" تكون أصغر حجماً وأكثر كفاءة.
-FROM python:3.9-slim-bullseye
+# 1) أدوات النظام + Xvfb + خطوط + إضافة مستودع جوجل كروم وتثبيته
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates curl gnupg \
+    xvfb x11-utils x11-apps python3-tk gnome-screenshot \
+    fonts-noto fonts-noto-color-emoji fonts-liberation \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://dl-ssl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /etc/apt/keyrings/google.gpg \
+    && echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/google.gpg] http://dl.google.com/linux/chrome/deb/ stable main" \
+       > /etc/apt/sources.list.d/google-chrome.list \
+    && apt-get update && apt-get install -y --no-install-recommends google-chrome-stable \
+    && rm -rf /var/lib/apt/lists/*
 
-# عيّن مجلد العمل داخل الحاوية. جميع الأوامر التالية ستنفذ من هذا المسار.
+# 2) مجلد العمل
 WORKDIR /app
 
-# ----------------------------------------------------
-# 2. تثبيت Google Chrome Stable والاعتماديات الهامة
-# هذا يحل مشكلة عدم تطابق إصدار المتصفح (Version Mismatch)
-# ----------------------------------------------------
-
-RUN apt-get update && apt-get install -y \
-    wget \
-    gnupg \
-    --no-install-recommends \
-# تنزيل مفتاح GPG لإضافة مستودع Google Chrome
-&& wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
-# إضافة مستودع Google Chrome إلى قائمة المصادر
-&& echo "deb http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list \
-# التحديث وتثبيت المتصفح الفعلي (Google Chrome Stable)
-&& apt-get update && apt-get install -y google-chrome-stable \
-# تثبيت حزم مساعدة ضرورية لـ Headless Mode (على الرغم من أن Chrome Stable قد يثبت معظمها)
-# libnss3 و libgconf-2-4 لم تعد ضرورية مع الإصدارات الحديثة، ولكن لن نضر بإبقائها
-# الحزمة الأساسية هي google-chrome-stable
-# حذف ملفات الحزم المؤقتة لتقليل حجم الصورة
-&& rm -rf /var/lib/apt/lists/*
-
-
-# -----------------
-# 3. تثبيت الاعتماديات (Dependencies)
-# -----------------
-
+# 3) تثبيت بايثون دِبندنسيز (requirements + PyAutoGUI)
 COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt \
+    && pip install --no-cache-dir "pillow>=9.2.0" pyautogui
 
-# قم بتثبيت جميع المكتبات المذكورة في الملف.
-RUN pip install --no-cache-dir -r requirements.txt
-
-# -----------------
-# 4. نسخ الكود وتشغيل التطبيق
-# -----------------
-
+# 4) نسخ الكود
 COPY . .
 
-# الأمر الذي سيتم تنفيذه عند بدء تشغيل الحاوية.
-# لا يتغير
-CMD ["python", "main.py"]
+# 5) (اختياري أفضل أمانًا) مستخدم غير root
+RUN useradd -m app && chown -R app:app /app
+USER app
+
+# 6) افتراضيًا نشغّل داخل Xvfb علشان PyAutoGUI يلاقي DISPLAY
+# لو عايز Headless Chrome فقط: غيّر الأمر وقت التشغيل لـ: python main.py
+CMD xvfb-run -a python main.py
