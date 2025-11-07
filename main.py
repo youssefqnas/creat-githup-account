@@ -94,7 +94,7 @@ def run_automation():
         options = uc.ChromeOptions()
         
         # وسائط تحسين الأداء في بيئات الحاوية
-        options.add_argument("headless-new")
+        #options.add_argument("headless-new")
         options.add_argument("--disable-gpu")
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
@@ -288,6 +288,7 @@ def run_automation():
 
 if __name__ == "__main__":
     run_automation()
+
 
 
 
